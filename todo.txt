@@ -1,0 +1,4 @@
+1.  split the data from the excel sheet into two separate .csv's, one for training and one for testing.
+    update the mapreduce to use only the training data
+2.  create more mapreduce functions to create more insights, implement using plotly
+3.  implement time-series analysis using both tensorflow/pytorch and prophet, and compare which provides better results
