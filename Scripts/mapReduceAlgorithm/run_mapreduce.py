@@ -8,7 +8,7 @@ hdfs_output_dir = "/coffee-sales-project/coffee_sales_output"
 
 # local paths
 local_input = "coffee_shop_sales.csv"
-local_output_dir = "mapreduce_output"
+local_output_dir = "../../old/mapreduce_output"
 
 # store in mapreduce_output/daily_revenue_per_store.tsv
 local_output_file = os.path.join(local_output_dir, "daily_revenue_per_store.tsv")

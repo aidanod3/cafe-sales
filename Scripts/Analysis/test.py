@@ -5,9 +5,9 @@ import plotly.express as px
 
 pd.set_option('future.no_silent_downcasting', True)
 
-if os.path.exists("coffee_shop_sales.pkl"):
+if os.path.exists("../../old/coffee_shop_sales.pkl"):
     # load cached dataframe
-    df = pd.read_pickle("coffee_shop_sales.pkl")
+    df = pd.read_pickle("../../old/coffee_shop_sales.pkl")
 else:
     # read from csv
     df = pd.read_excel("coffee_shop_sales.xlsx")

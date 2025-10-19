@@ -3,7 +3,7 @@ from prophet import Prophet
 import matplotlib.pyplot as plt
 
 # tsv path
-file_path = "mapreduce_output/daily_revenue_per_store.tsv"
+file_path = "../../Data/processedData/daily_revenue_per_store.tsv"
 
 # read tsv into dataframe
 df = pd.read_csv(file_path, sep='\t', names=['date_store', 'daily_revenue'])
