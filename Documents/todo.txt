@@ -2,3 +2,42 @@
     update the mapreduce to use only the training data
 2.  create more mapreduce functions to create more insights, implement using plotly
 3.  implement time-series analysis using both tensorflow/pytorch and prophet, and compare which provides better results
+
+1. Organize File Structure
+     Data
+        Have Data in one directory, the original raw data and then the data we clean/process
+        Hadoop Map Reduce Output Data can also go here
+     Python (Scripts)
+        We should probably have all our scripts in one spot
+        A Directory for scripts pertaining to anything Mapreduce
+     Analysis
+        Another directory for analytics
+        main.py (since it currently contains our Dash stuff)
+        Prophet_test.py
+        test.py
+
+2. Clean up any remaining data, like combining the transaction date with the transaction time into a single column
+    Normalize store and product names (i.e. Store_1 vs Store 2)
+    Make sure there are no null or zero values
+    Add a revenue column directly
+
+3. We can enhance the capabilities of our MapReduce…
+    Daily Revenue per Item
+    Monthly Revenue per Store
+    Average_Transcation_Value
+    Hourly Revenue per Store
+
+4. Add more features to our Dash visualization
+    Be able to change store, product, or date range
+    Change time frame from daily to weekly to monthly
+    Maybe be able to sort to find out Top 10 Products or easily find peaks
+
+5. Add different visualizations
+    Bar charts, heat maps, pie charts, and trend lines
+
+6. Expand prophet capabilities
+    Instead of prophet focusing on just one store lets have it loop through all of them and then find its error predictions
+    Add other forecasting models?
+    Maybe try Arima, LSTM, or XGBoost and compare their results to prophet
+
+7. Use all these metrics to get insights into our data
