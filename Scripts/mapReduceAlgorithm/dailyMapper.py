@@ -31,7 +31,7 @@ for row in reader:
 
         key = f"{store_id}|{groupedDays}"
 
-        print(f"{key}\t{revenue}")
+        print(f"{key}\t{revenue:.2f}")
 
     except Exception:
         continue

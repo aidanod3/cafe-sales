@@ -19,10 +19,10 @@ for line in sys.stdin:
         currentSum += value
     else:
         if currentKey is not None:
-            print(f"{currentKey}\t{currentSum}")
+            print(f"{currentKey}\t{currentSum:.2f}")
 
         currentKey = key
         currentSum = value
 
 if currentKey is not None:
-    print(f"{currentKey}\t{currentSum}")
+    print(f"{currentKey}\t{currentSum:.2f}")
