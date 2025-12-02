@@ -1,0 +1,264 @@
+from dash import Dash, html, dash_table, dcc, Input, Output
+import dash_bootstrap_components as dbc
+import pandas as pd
+import plotly.express as px
+
+# bootstrap Theme
+app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
+
+
+# load and clean data
+file_path = "../../Data/processedData/daily_revenue_per_store.tsv"
+
+df = pd.read_csv(file_path, sep='\t', names=['date_store', 'daily_revenue'])
+
+df[['date', 'store_id']] = df['date_store'].str.split('|', expand=True)
+df['daily_revenue'] = df['daily_revenue'].astype(float)
+df['date'] = pd.to_datetime(df['date'], format='%m/%d/%y')
+
+df = df[['date', 'store_id', 'daily_revenue']].sort_values(['date','store_id'])
+
+# Convert store_id to string
+df['store_id'] = df['store_id'].astype(str)
+
+# monthly data
+monthly = (
+    df.groupby([df['date'].dt.to_period('M').astype(str), 'store_id'])['daily_revenue']
+    .sum()
+    .reset_index()
+    .rename(columns={'date': 'month', 'daily_revenue': 'revenue'})
+)
+
+# weekly data
+weekly = (
+    df.groupby([df['date'].dt.isocalendar().week, 'store_id'])['daily_revenue']
+    .sum()
+    .reset_index()
+    .rename(columns={'date': 'week', 'daily_revenue': 'revenue'})
+)
+
+# hourly Data
+hourly_file = "../../Data/processedData/hourly_revenue_per_store.tsv"
+hourly_df = pd.read_csv(hourly_file, sep='\t', names=['store_datetime', 'revenue'])
+# split "3|2023-01-01 11:00:00" into store_id + datetime
+hourly_df[['store_id', 'datetime']] = hourly_df['store_datetime'].str.split('|', expand=True)
+hourly_df['store_id'] = hourly_df['store_id'].astype(str)
+# convert datetime correctly
+hourly_df['datetime'] = pd.to_datetime(hourly_df['datetime'], format="%Y-%m-%d %H:%M:%S")
+# extract date and hour
+hourly_df['date'] = hourly_df['datetime'].dt.date
+hourly_df['hour'] = hourly_df['datetime'].dt.hour
+hourly_df = hourly_df[['date', 'store_id', 'hour', 'revenue']]
+hourly_df = hourly_df.sort_values(['date', 'store_id', 'hour'])
+
+# monthly item sales per store
+item_file = "../../Data/processedData/monthlySalesPerItemPerStore.tsv"
+
+item_df = pd.read_csv(
+    item_file,
+    sep="\t",
+    names=["store_item_month", "revenue"]
+)
+# split "3|10|2023-01"
+item_df[["store_id", "item_id", "month"]] = (
+    item_df["store_item_month"].str.split("|", expand=True)
+)
+item_df["store_id"] = item_df["store_id"].astype(int)
+item_df["item_id"] = item_df["item_id"].astype(int)
+item_df["revenue"] = item_df["revenue"].astype(float)
+
+
+
+def make_fig(timeframe, selected_stores):
+    if timeframe == "Daily":
+        filtered = df[df["store_id"].isin(selected_stores)]
+        fig = px.line(filtered, x="date", y="daily_revenue", color="store_id",
+                      markers=True, title="Daily Revenue per Store")
+
+    elif timeframe == "Weekly":
+        filtered = weekly[weekly["store_id"].isin(selected_stores)]
+        fig = px.line(filtered, x="week", y="revenue", color="store_id",
+                      markers=True, title="Weekly Revenue per Store")
+
+    else:  # monthly
+        filtered = monthly[monthly["store_id"].isin(selected_stores)]
+        fig = px.line(filtered, x="month", y="revenue", color="store_id",
+                      markers=True, title="Monthly Revenue per Store")
+
+    fig.update_layout(template="plotly_white")
+    return fig
+
+
+# layout
+app.layout = dbc.Container([
+
+    html.H2("Coffee Shop Dashboard", className="my-4"),
+
+    dbc.Row([
+        dbc.Col([
+            # store selector dropdown
+            dcc.Dropdown(
+                id="store-dropdown",
+                options=[{"label": f"Store {s}", "value": str(s)} for s in [3, 5, 8]],
+                value=["3", "5", "8"],   # default: show all three
+                multi=True,
+                placeholder="Select store(s)"
+            )
+        ], md=4)
+    ], className="mb-3"),
+
+    # tabs
+    dbc.Tabs(
+        [
+            dbc.Tab(label="Daily", tab_id="Daily"),
+            dbc.Tab(label="Weekly", tab_id="Weekly"),
+            dbc.Tab(label="Monthly", tab_id="Monthly"),
+        ],
+        id="revenue-tabs",
+        active_tab="Monthly",
+        className="mb-4"
+    ),
+
+    # chart card
+    dbc.Card([
+        dbc.CardHeader("Revenue Trends"),
+        dbc.CardBody([
+            dcc.Graph(id="revenue-graph")
+        ])
+    ], className="shadow mb-4"),
+
+    # hourly revenue controls + chart
+    dbc.Card([
+        dbc.CardHeader("Hourly Revenue"),
+        dbc.CardBody([
+            dbc.Row([
+                dbc.Col([
+                    dcc.Dropdown(
+                        id="hourly-store",
+                        options=[{"label": f"Store {s}", "value": str(s)} for s in [3, 5, 8]],
+                        value="3",
+                        clearable=False
+                    )
+                ], md=3),
+
+                dbc.Col([
+                    dcc.DatePickerSingle(
+                        id="hourly-date",
+                        date=df['date'].min(),  # default earliest date
+                        display_format="YYYY-MM-DD"
+                    )
+                ], md=3)
+            ], className="mb-3"),
+
+            dcc.Graph(id="hourly-graph")
+        ])
+    ], className="shadow mb-4"),
+
+    # item sales card
+    dbc.Card([
+        dbc.CardHeader("Item Sales Per Store"),
+        dbc.CardBody([
+
+            dbc.Row([
+                dbc.Col([
+                    html.Label("Select Store:"),
+                    dcc.Dropdown(
+                        id="item-store",
+                        options=[{"label": f"Store {s}", "value": s} for s in sorted(item_df["store_id"].unique())],
+                        value=sorted(item_df["store_id"].unique())[0],
+                        clearable=False
+                    )
+                ], width=4),
+
+                dbc.Col([
+                    html.Label("Select Month:"),
+                    dcc.Dropdown(
+                        id="item-month",
+                        options=[{"label": m, "value": m} for m in sorted(item_df["month"].unique())],
+                        value=sorted(item_df["month"].unique())[0],
+                        clearable=False
+                    )
+                ], width=4),
+            ], className="mb-4"),
+
+            dcc.Graph(id="item-sales-graph")
+
+        ])
+    ], className="shadow mb-4")
+
+
+
+], fluid=True)
+
+
+# callback: update graph when tab or store changes
+@app.callback(
+    Output("revenue-graph", "figure"),
+    Input("revenue-tabs", "active_tab"),
+    Input("store-dropdown", "value")
+)
+def update_graph(active_tab, selected_stores):
+    return make_fig(active_tab, selected_stores)
+
+# hourly Chart Callback
+@app.callback(
+    Output("hourly-graph", "figure"),
+    Input("hourly-store", "value"),
+    Input("hourly-date", "date")
+)
+def update_hourly_graph(store_id, selected_date):
+
+    selected_date = pd.to_datetime(selected_date).date()
+
+    filtered = hourly_df[
+        (hourly_df["store_id"] == store_id) &
+        (hourly_df["date"] == selected_date)
+    ]
+
+    fig = px.bar(
+        filtered,
+        x="hour",
+        y="revenue",
+        title=f"Hourly Revenue – Store {store_id} on {selected_date}",
+        labels={"hour": "Hour of Day", "revenue": "Revenue"}
+    )
+
+    fig.update_layout(template="plotly_white")
+    return fig
+
+@app.callback(
+    Output("item-sales-graph", "figure"),
+    Input("item-store", "value"),
+    Input("item-month", "value")
+)
+def update_item_sales(store_id, month):
+
+    filtered = item_df[
+        (item_df["store_id"] == store_id) &
+        (item_df["month"] == month)
+    ]
+
+    # sort by revenue descending
+    filtered = filtered.sort_values("revenue", ascending=False)
+
+    fig = px.bar(
+        filtered,
+        x="item_id",
+        y="revenue",
+        title=f"Item Sales for Store {store_id} — {month}",
+        labels={"item_id": "Item ID", "revenue": "Revenue"},
+    )
+
+    # make x-axis categorical and preserve order from sorted DataFrame
+    fig.update_layout(
+        template="plotly_white",
+        xaxis=dict(type="category")
+    )
+
+    return fig
+
+
+
+# run the app
+if __name__ == '__main__':
+    app.run(debug=True)
