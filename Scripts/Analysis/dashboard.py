@@ -3,9 +3,8 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
 
-# bootstrap Theme
-app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
-
+# bootstrap theme
+app = Dash(__name__, external_stylesheets=[dbc.themes.ZEPHYR])
 
 # load and clean data
 file_path = "../../Data/processedData/daily_revenue_per_store.tsv"
@@ -18,7 +17,7 @@ df['date'] = pd.to_datetime(df['date'], format='%m/%d/%y')
 
 df = df[['date', 'store_id', 'daily_revenue']].sort_values(['date','store_id'])
 
-# Convert store_id to string
+# convert store_id to string
 df['store_id'] = df['store_id'].astype(str)
 
 # monthly data
@@ -37,10 +36,10 @@ weekly = (
     .rename(columns={'date': 'week', 'daily_revenue': 'revenue'})
 )
 
-# hourly Data
+# hourly data
 hourly_file = "../../Data/processedData/hourly_revenue_per_store.tsv"
 hourly_df = pd.read_csv(hourly_file, sep='\t', names=['store_datetime', 'revenue'])
-# split "3|2023-01-01 11:00:00" into store_id + datetime
+# split into store_id + datetime
 hourly_df[['store_id', 'datetime']] = hourly_df['store_datetime'].str.split('|', expand=True)
 hourly_df['store_id'] = hourly_df['store_id'].astype(str)
 # convert datetime correctly
@@ -53,21 +52,31 @@ hourly_df = hourly_df.sort_values(['date', 'store_id', 'hour'])
 
 # monthly item sales per store
 item_file = "../../Data/processedData/monthlySalesPerItemPerStore.tsv"
+# product lookup table (convert item_id to product_detail)
+lookup_file = "../../Data/processedData/lookupTable.csv"
 
+# load lookup table
+lookup_table = pd.read_csv(lookup_file)
+lookup_table["product_id"] = lookup_table["product_id"].astype(int)
+
+# load item sales
 item_df = pd.read_csv(
     item_file,
     sep="\t",
     names=["store_item_month", "revenue"]
 )
-# split "3|10|2023-01"
-item_df[["store_id", "item_id", "month"]] = (
+
+# split
+item_df[["store_id", "product_id", "month"]] = (
     item_df["store_item_month"].str.split("|", expand=True)
 )
+
 item_df["store_id"] = item_df["store_id"].astype(int)
-item_df["item_id"] = item_df["item_id"].astype(int)
+item_df["product_id"] = item_df["product_id"].astype(int)
 item_df["revenue"] = item_df["revenue"].astype(float)
 
-
+#merge on product_id
+item_df = item_df.merge(lookup_table, on="product_id", how="left")
 
 def make_fig(timeframe, selected_stores):
     if timeframe == "Daily":
@@ -94,65 +103,68 @@ app.layout = dbc.Container([
 
     html.H2("Coffee Shop Dashboard", className="my-4"),
 
-    dbc.Row([
-        dbc.Col([
-            # store selector dropdown
-            dcc.Dropdown(
-                id="store-dropdown",
-                options=[{"label": f"Store {s}", "value": str(s)} for s in [3, 5, 8]],
-                value=["3", "5", "8"],   # default: show all three
-                multi=True,
-                placeholder="Select store(s)"
-            )
-        ], md=4)
-    ], className="mb-3"),
 
-    # tabs
-    dbc.Tabs(
-        [
-            dbc.Tab(label="Daily", tab_id="Daily"),
-            dbc.Tab(label="Weekly", tab_id="Weekly"),
-            dbc.Tab(label="Monthly", tab_id="Monthly"),
-        ],
-        id="revenue-tabs",
-        active_tab="Monthly",
-        className="mb-4"
-    ),
-
-    # chart card
+    # revenue trends card (daily/weekly/monthly)
     dbc.Card([
         dbc.CardHeader("Revenue Trends"),
+
         dbc.CardBody([
+
+            # store selector
+            dbc.Row([
+                dbc.Col([
+                    html.Label("Select Store(s):"),
+                    dcc.Dropdown(
+                        id="store-dropdown",
+                        options=[{"label": f"Store {s}", "value": str(s)} for s in [3, 5, 8]],
+                        value=["3", "5", "8"],
+                        multi=True,
+                        placeholder="Select store(s)"
+                    )
+                ], width=4)
+            ], className="mb-3"),
+
+            dbc.Tabs(
+                [
+                    dbc.Tab(label="Daily", tab_id="Daily"),
+                    dbc.Tab(label="Weekly", tab_id="Weekly"),
+                    dbc.Tab(label="Monthly", tab_id="Monthly"),
+                ],
+                id="revenue-tabs",
+                active_tab="Monthly",
+                className="mb-4"
+            ),
+
             dcc.Graph(id="revenue-graph")
         ])
     ], className="shadow mb-4"),
 
-    # hourly revenue controls + chart
-    dbc.Card([
-        dbc.CardHeader("Hourly Revenue"),
-        dbc.CardBody([
-            dbc.Row([
-                dbc.Col([
-                    dcc.Dropdown(
-                        id="hourly-store",
-                        options=[{"label": f"Store {s}", "value": str(s)} for s in [3, 5, 8]],
-                        value="3",
-                        clearable=False
-                    )
-                ], md=3),
+    # hourly revenue card
+        dbc.Card([
+            dbc.CardHeader("Hourly Revenue"),
+            dbc.CardBody([
+                dbc.Row([
+                    dbc.Col([
+                        dcc.Dropdown(
+                            id="hourly-store",
+                            options=[{"label": f"Store {s}", "value": str(s)} for s in [3, 5, 8]],
+                            value="3",
+                            clearable=False
+                        )
+                    ], md=3),
 
-                dbc.Col([
-                    dcc.DatePickerSingle(
-                        id="hourly-date",
-                        date=df['date'].min(),  # default earliest date
-                        display_format="YYYY-MM-DD"
-                    )
-                ], md=3)
-            ], className="mb-3"),
+                    dbc.Col([
+                        dcc.DatePickerSingle(
+                            id="hourly-date",
+                            date=df['date'].min(),  # default earliest date
+                            display_format="YYYY-MM-DD"
+                        )
+                    ], md=3)
+                ], className="mb-3"),
 
-            dcc.Graph(id="hourly-graph")
-        ])
-    ], className="shadow mb-4"),
+                dcc.Graph(id="hourly-graph")
+            ])
+        ], className="shadow mb-4"),
 
     # item sales card
     dbc.Card([
@@ -187,9 +199,7 @@ app.layout = dbc.Container([
     ], className="shadow mb-4")
 
 
-
 ], fluid=True)
-
 
 # callback: update graph when tab or store changes
 @app.callback(
@@ -200,7 +210,7 @@ app.layout = dbc.Container([
 def update_graph(active_tab, selected_stores):
     return make_fig(active_tab, selected_stores)
 
-# hourly Chart Callback
+# hourly chart callback
 @app.callback(
     Output("hourly-graph", "figure"),
     Input("hourly-store", "value"),
@@ -238,18 +248,17 @@ def update_item_sales(store_id, month):
         (item_df["month"] == month)
     ]
 
-    # sort by revenue descending
+    # sort highest to lowest
     filtered = filtered.sort_values("revenue", ascending=False)
 
     fig = px.bar(
         filtered,
-        x="item_id",
+        x="product_detail",
         y="revenue",
         title=f"Item Sales for Store {store_id} — {month}",
-        labels={"item_id": "Item ID", "revenue": "Revenue"},
+        labels={"product_detail": "Item", "revenue": "Revenue"},
     )
 
-    # make x-axis categorical and preserve order from sorted DataFrame
     fig.update_layout(
         template="plotly_white",
         xaxis=dict(type="category")
@@ -257,8 +266,5 @@ def update_item_sales(store_id, month):
 
     return fig
 
-
-
-# run the app
 if __name__ == '__main__':
     app.run(debug=True)
