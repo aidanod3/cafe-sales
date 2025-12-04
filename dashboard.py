@@ -54,7 +54,7 @@ hourly_df = hourly_df.sort_values(['date', 'store_id', 'hour'])
 # monthly item sales per store
 item_file = "Data/processedData/monthlySalesPerItemPerStore.tsv"
 # product lookup table (convert item_id to product_detail)
-lookup_file = "Data/processedData/lookupTable.csv"
+lookup_file = "Data/processedData/lookupTableDetailed.csv"
 
 # load lookup table
 lookup_table = pd.read_csv(lookup_file)
@@ -205,7 +205,11 @@ app.layout = dbc.Container([
                 ], width=3),
             ], className="mb-4"),
 
-            dcc.Graph(id="item-sales-graph")
+            dcc.Graph(id="item-sales-graph"),
+
+            html.Hr(),
+            html.H5("Best-Selling Detailed Items", className="mt-3"),
+            dcc.Graph(id="item-detailed-graph")
 
         ])
     ], className="shadow mb-4")
@@ -289,6 +293,61 @@ def update_item_sales(store_id, month, selected_category):
     )
 
     fig.update_layout(template="plotly_white", xaxis=dict(type="category"))
+    return fig
+
+@app.callback(
+    Output("item-detailed-graph", "figure"),
+    Input("item-store", "value"),
+    Input("item-month", "value"),
+    Input("item-category", "value")
+)
+def update_item_detail_graph(store_id, month, selected_category):
+    # filter by store and month
+    filtered = item_df[
+        (item_df["store_id"] == store_id) &
+        (item_df["month"] == month)
+    ]
+
+    # filter by category if not "All"
+    if selected_category != "All":
+        filtered = filtered[filtered["product_category"] == selected_category]
+
+    # aggregate revenue per product_category + product_detail (item-level)
+    detail = (
+        filtered
+        .groupby(["product_category", "product_detail"], as_index=False)["revenue"]
+        .sum()
+    )
+
+    # sort by category, then by revenue descending
+    detail = detail.sort_values(
+        ["product_category", "revenue"],
+        ascending=[True, False]
+    )
+
+    # optionally limit to top N items overall (to avoid a super long x-axis)
+    detail = detail.head(25)
+
+    # title
+    if selected_category == "All":
+        title = f"Top Items by Detail – Store {store_id} ({month})"
+    else:
+        title = f"Top {selected_category} Items – Store {store_id} ({month})"
+
+    fig = px.bar(
+        detail,
+        x="product_detail",
+        y="revenue",
+        color="product_category",
+        title=title,
+        labels={"product_detail": "Item", "revenue": "Revenue"},
+    )
+
+    fig.update_layout(
+        template="plotly_white",
+        xaxis=dict(type="category", tickangle=-45)
+    )
+
     return fig
 
 
