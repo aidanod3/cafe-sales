@@ -5,9 +5,10 @@ import plotly.express as px
 
 # bootstrap theme
 app = Dash(__name__, external_stylesheets=[dbc.themes.ZEPHYR])
+server = app.server
 
 # load and clean data
-file_path = "../../Data/processedData/daily_revenue_per_store.tsv"
+file_path = "Data/processedData/daily_revenue_per_store.tsv"
 
 df = pd.read_csv(file_path, sep='\t', names=['date_store', 'daily_revenue'])
 
@@ -37,7 +38,7 @@ weekly = (
 )
 
 # hourly data
-hourly_file = "../../Data/processedData/hourly_revenue_per_store.tsv"
+hourly_file = "Data/processedData/hourly_revenue_per_store.tsv"
 hourly_df = pd.read_csv(hourly_file, sep='\t', names=['store_datetime', 'revenue'])
 # split into store_id + datetime
 hourly_df[['store_id', 'datetime']] = hourly_df['store_datetime'].str.split('|', expand=True)
@@ -51,9 +52,9 @@ hourly_df = hourly_df[['date', 'store_id', 'hour', 'revenue']]
 hourly_df = hourly_df.sort_values(['date', 'store_id', 'hour'])
 
 # monthly item sales per store
-item_file = "../../Data/processedData/monthlySalesPerItemPerStore.tsv"
+item_file = "Data/processedData/monthlySalesPerItemPerStore.tsv"
 # product lookup table (convert item_id to product_detail)
-lookup_file = "../../Data/processedData/lookupTable.csv"
+lookup_file = "Data/processedData/lookupTable.csv"
 
 # load lookup table
 lookup_table = pd.read_csv(lookup_file)
