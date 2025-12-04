@@ -180,7 +180,7 @@ app.layout = dbc.Container([
                         value=sorted(item_df["store_id"].unique())[0],
                         clearable=False
                     )
-                ], width=4),
+                ], width=3),
 
                 dbc.Col([
                     html.Label("Select Month:"),
@@ -190,14 +190,24 @@ app.layout = dbc.Container([
                         value=sorted(item_df["month"].unique())[0],
                         clearable=False
                     )
-                ], width=4),
+                ], width=3),
+
+                dbc.Col([
+                    html.Label("Filter by Category:"),
+                    dcc.Dropdown(
+                        id="item-category",
+                        options=[{"label": "All Categories", "value": "All"}] +
+                                [{"label": c, "value": c} for c in sorted(item_df["product_category"].unique())],
+                        value="All",
+                        clearable=False
+                    )
+                ], width=3),
             ], className="mb-4"),
 
             dcc.Graph(id="item-sales-graph")
 
         ])
     ], className="shadow mb-4")
-
 
 ], fluid=True)
 
@@ -239,31 +249,41 @@ def update_hourly_graph(store_id, selected_date):
 @app.callback(
     Output("item-sales-graph", "figure"),
     Input("item-store", "value"),
-    Input("item-month", "value")
+    Input("item-month", "value"),
+    Input("item-category", "value")
 )
-def update_item_sales(store_id, month):
+def update_item_sales(store_id, month, selected_category):
 
+    # base filter: store + month
     filtered = item_df[
         (item_df["store_id"] == store_id) &
         (item_df["month"] == month)
     ]
 
-    # sort highest to lowest
+    # apply category filter unless "All"
+    if selected_category != "All":
+        filtered = filtered[filtered["product_category"] == selected_category]
+
+    # sort descending by revenue
     filtered = filtered.sort_values("revenue", ascending=False)
+
+    # title
+    title = (
+        f"Item Sales for Store {store_id} — {month}"
+        if selected_category == "All"
+        else f"{selected_category} Items — Store {store_id} ({month})"
+    )
 
     fig = px.bar(
         filtered,
-        x="product_detail",
+        x="product_type",
         y="revenue",
-        title=f"Item Sales for Store {store_id} — {month}",
-        labels={"product_detail": "Item", "revenue": "Revenue"},
+        color="product_category",
+        title=title,
+        labels={"product_type": "Product", "revenue": "Revenue"},
     )
 
-    fig.update_layout(
-        template="plotly_white",
-        xaxis=dict(type="category")
-    )
-
+    fig.update_layout(template="plotly_white", xaxis=dict(type="category"))
     return fig
 
 if __name__ == '__main__':
