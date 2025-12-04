@@ -254,18 +254,21 @@ def update_hourly_graph(store_id, selected_date):
 )
 def update_item_sales(store_id, month, selected_category):
 
-    # base filter: store + month
+    # filter by store and month
     filtered = item_df[
         (item_df["store_id"] == store_id) &
         (item_df["month"] == month)
     ]
 
-    # apply category filter unless "All"
+    # filter by category if not "All"
     if selected_category != "All":
         filtered = filtered[filtered["product_category"] == selected_category]
 
+    # aggregate revenue per product_type
+    agg = filtered.groupby(["product_type", "product_category"], as_index=False)["revenue"].sum()
+
     # sort descending by revenue
-    filtered = filtered.sort_values("revenue", ascending=False)
+    agg = agg.sort_values("revenue", ascending=False)
 
     # title
     title = (
@@ -274,17 +277,19 @@ def update_item_sales(store_id, month, selected_category):
         else f"{selected_category} Items — Store {store_id} ({month})"
     )
 
+    # create figure
     fig = px.bar(
-        filtered,
+        agg,
         x="product_type",
         y="revenue",
-        color="product_category",
+        color="product_category" if selected_category == "All" else None,
         title=title,
         labels={"product_type": "Product", "revenue": "Revenue"},
     )
 
     fig.update_layout(template="plotly_white", xaxis=dict(type="category"))
     return fig
+
 
 if __name__ == '__main__':
     app.run(debug=True)

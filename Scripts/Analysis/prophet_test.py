@@ -1,54 +1,52 @@
 import pandas as pd
 from prophet import Prophet
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 import matplotlib.pyplot as plt
+import numpy as np
 
-# tsv path
+# load data
 file_path = "../../Data/processedData/daily_revenue_per_store.tsv"
-
-# read tsv into dataframe
 df = pd.read_csv(file_path, sep='\t', names=['date_store', 'daily_revenue'])
+df[['ds', 'store_id']] = df['date_store'].str.split('|', expand=True)
+df['y'] = df['daily_revenue'].astype(float)
+df['ds'] = pd.to_datetime(df['ds'], format='%m/%d/%y')
+df = df[['ds', 'store_id', 'y']].sort_values(['ds', 'store_id']).reset_index(drop=True)
 
-# split composite key into 'date' and 'store_id'
-df[['date', 'store_id']] = df['date_store'].str.split('|', expand=True)
+# split training and testing data (just using store 3)
+store_id = '3'  # example store
+store_df = df[df['store_id'] == store_id][['ds', 'y']]
 
-# convert data types from string
-df['daily_revenue'] = df['daily_revenue'].astype(float)
-df['date'] = pd.to_datetime(df['date'], format='%m/%d/%y')
-df = df.sort_values(['date', 'store_id']).reset_index(drop=True)
+# use 5 months for training, last month for testing
+cutoff_date = store_df['ds'].max() - pd.DateOffset(months=1)
+train_df = store_df[store_df['ds'] <= cutoff_date]
+test_df = store_df[store_df['ds'] > cutoff_date]
 
-# remove date_store col
-df = df[['date', 'store_id', 'daily_revenue']]
-
-# rename cols
-df = df.rename(columns={'date': 'ds', 'daily_revenue': 'y'})
-
-# separate into training and testing data
-last_index = df.index[-1]
-training_data_max = round(last_index * 0.8) # 119292
-
-training_data = df[df.index <= training_data_max] # (0 -> 434)
-testing_data = df[df.index > training_data_max] # (435 -> 542)
-
-# group training data by store_id
-grouped = training_data.groupby('store_id')
-
-# degroup into separate df's and remove store_id col
-df_store3 = grouped.get_group('3')[['ds', 'y']]
-df_store5 = grouped.get_group('5')[['ds', 'y']]
-df_store8 = grouped.get_group('8')[['ds', 'y']]
-
-# print(df_store3)
-# print(df_store5)
-# print(df_store8)
-
+# fit prophet
 m = Prophet()
-m.fit(df_store3)
+m.fit(train_df)
 
-future = m.make_future_dataframe(periods=36)
-print(future)
-
+# make future preidctions for test period
+future = m.make_future_dataframe(periods=len(test_df))
 forecast = m.predict(future)
-print(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(36))
 
-fig1 = m.plot(forecast)
+# merge forecast values with actual values
+forecast_test = forecast.set_index('ds').join(test_df.set_index('ds'), how='inner')
+y_true = forecast_test['y'].values
+y_pred = forecast_test['yhat'].values
+
+# get metrics
+mae = mean_absolute_error(y_true, y_pred)
+rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+
+print(f"Forecast Accuracy for Store {store_id}:")
+print(f"MAE: {mae:.2f}")
+print(f"RMSE: {rmse:.2f}")
+print(f"MAPE: {mape:.2f}%")
+
+# plot
+fig = m.plot(forecast)
+plt.scatter(test_df['ds'], test_df['y'], color='red', label='Actual')
+plt.title(f'Store {store_id} Forecast vs Actual')
+plt.legend()
 plt.show()

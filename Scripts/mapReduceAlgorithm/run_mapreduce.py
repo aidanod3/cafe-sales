@@ -8,7 +8,7 @@ hdfs_output_dir = "/coffee-sales-project/coffee_sales_output"
 
 # local paths
 local_input = "coffee_shop_sales.csv"
-local_output_dir = "../../old/mapreduce_output"
+local_output_dir = "../../Deprecated/mapreduce_output"
 
 # store in mapreduce_output/daily_revenue_per_store.tsv
 local_output_file = os.path.join(local_output_dir, "daily_revenue_per_store.tsv")
@@ -22,7 +22,7 @@ subprocess.run(["hdfs", "dfs", "-mkdir", "-p", hdfs_input_dir], check=True)
 subprocess.run(["hdfs", "dfs", "-put", "-f", local_input, hdfs_input_dir], check=True)
 
 # remove previous hdfs output if exists
-print("Removing old HDFS output if it exists...")
+print("Removing Deprecated HDFS output if it exists...")
 subprocess.run(["hdfs", "dfs", "-rm", "-r", "-f", hdfs_output_dir], check=True)
 
 # hadoop streaming jar location
