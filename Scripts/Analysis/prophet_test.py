@@ -65,6 +65,7 @@ for store_id in stores:
     plt.scatter(test_df['ds'], test_df['y'], color='red', label='Actual')
     plt.title(f'Store {store_id} Forecast vs Actual')
     plt.legend()
+    plt.tight_layout()
     plt.show()
 
 # summary table at end
