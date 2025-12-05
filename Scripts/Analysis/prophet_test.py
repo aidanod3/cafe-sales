@@ -12,41 +12,62 @@ df['y'] = df['daily_revenue'].astype(float)
 df['ds'] = pd.to_datetime(df['ds'], format='%m/%d/%y')
 df = df[['ds', 'store_id', 'y']].sort_values(['ds', 'store_id']).reset_index(drop=True)
 
-# split training and testing data (just using store 3)
-store_id = '3'  # example store
-store_df = df[df['store_id'] == store_id][['ds', 'y']]
+# stores to forecast
+stores = ["3", "5", "8"]
 
-# use 5 months for training, last month for testing
-cutoff_date = store_df['ds'].max() - pd.DateOffset(months=1)
-train_df = store_df[store_df['ds'] <= cutoff_date]
-test_df = store_df[store_df['ds'] > cutoff_date]
+results = []  # store accuracy metrics here
 
-# fit prophet
-m = Prophet()
-m.fit(train_df)
+for store_id in stores:
+    print("=" * 60)
+    print(f"Running Forecast for Store {store_id}")
+    print("=" * 60)
 
-# make future preidctions for test period
-future = m.make_future_dataframe(periods=len(test_df))
-forecast = m.predict(future)
+    # subset
+    store_df = df[df['store_id'] == store_id][['ds', 'y']]
 
-# merge forecast values with actual values
-forecast_test = forecast.set_index('ds').join(test_df.set_index('ds'), how='inner')
-y_true = forecast_test['y'].values
-y_pred = forecast_test['yhat'].values
+    # split: last month = test
+    cutoff_date = store_df['ds'].max() - pd.DateOffset(months=1)
+    train_df = store_df[store_df['ds'] <= cutoff_date]
+    test_df = store_df[store_df['ds'] > cutoff_date]
 
-# get metrics
-mae = mean_absolute_error(y_true, y_pred)
-rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+    # fit prophet
+    m = Prophet()
+    m.fit(train_df)
 
-print(f"Forecast Accuracy for Store {store_id}:")
-print(f"MAE: {mae:.2f}")
-print(f"RMSE: {rmse:.2f}")
-print(f"MAPE: {mape:.2f}%")
+    # future dataframe (same length as test)
+    future = m.make_future_dataframe(periods=len(test_df))
+    forecast = m.predict(future)
 
-# plot
-fig = m.plot(forecast)
-plt.scatter(test_df['ds'], test_df['y'], color='red', label='Actual')
-plt.title(f'Store {store_id} Forecast vs Actual')
-plt.legend()
-plt.show()
+    # join predicted with actual
+    forecast_test = forecast.set_index('ds').join(test_df.set_index('ds'), how='inner')
+    y_true = forecast_test['y'].values
+    y_pred = forecast_test['yhat'].values
+
+    # metrics
+    mae = mean_absolute_error(y_true, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+    mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+
+    results.append({
+        "store_id": store_id,
+        "MAE": mae,
+        "RMSE": rmse,
+        "MAPE": mape
+    })
+
+    # print results
+    print(f"MAE:  {mae:.2f}")
+    print(f"RMSE: {rmse:.2f}")
+    print(f"MAPE: {mape:.2f}%")
+
+    # plot
+    fig = m.plot(forecast)
+    plt.scatter(test_df['ds'], test_df['y'], color='red', label='Actual')
+    plt.title(f'Store {store_id} Forecast vs Actual')
+    plt.legend()
+    plt.show()
+
+# summary table at end
+print("\nforecast summary")
+summary_df = pd.DataFrame(results)
+print(summary_df)
